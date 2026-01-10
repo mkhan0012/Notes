@@ -1,23 +1,21 @@
 import { NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 
-// Debugging log to confirm the route is loaded
-console.log("---------------- API ROUTE LOADED ----------------");
-
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
 export async function POST(req: Request) {
   try {
-    const { text, mode, subMode } = await req.json();
+    // 👇 FIX: Extract all needed variables from the JSON body here
+    const { text, mode, subMode, question, userAnswer } = await req.json();
 
-    if (!text) return NextResponse.json({ result: "No text provided." });
+    if (!text && mode !== 'quiz-grade') return NextResponse.json({ result: "No text provided." });
 
     let systemPrompt = "You are an expert study assistant.";
 
     switch (mode) {
-      // --- MODE 1: SUMMARIZATION ---
+      // --- EXISTING MODES ---
       case 'summary':
         if (subMode === '1-Min Revision') {
           systemPrompt = "You are a revision expert. Summarize this into 3-5 high-impact bullet points. Focus ONLY on the critical facts. Use bold text for keywords.";
@@ -32,63 +30,102 @@ export async function POST(req: Request) {
         }
         break;
 
-      // --- MODE 2: QUIZ GENERATION ---
       case 'quiz':
         systemPrompt = "Generate 3 Multiple Choice Questions (MCQs) based on the text. Format clearly with options A) B) C) D). Place the **Correct Answers** hidden at the very bottom.";
         break;
 
-      // --- MODE 3: AUTO-FORMAT (FULL PAGE BEAUTIFIER) ---
       case 'auto-format':
         systemPrompt = `
-          You are an elite Technical Interview Coach. 
-          The user has pasted raw, messy notes. Your job is to restructure them into a "Master Interview Guide".
-          
-          For EVERY topic in the text, you MUST use this exact structure:
-          
-          ## [Emoji] [Topic Name]
-          ### ✅ **Interview Answer**
-          (A clear, concise definition 1-2 sentences).
-          
-          ### 🌍 **Real-Life Example**
-          (Explain it using a non-technical analogy like pizza, traffic, home appliances, etc. Use blockquotes >).
-          
-          ### 💡 **Explanation**
-          (Why does this matter? One short distinct point).
-          
-          ---
-          
-          Rules:
-          1. Use specific emojis for every header.
-          2. **Bold** all keywords.
-          3. Fix all grammar.
-          4. Keep it human and conversational.
+          You are MindScribe AI. Transform messy notes into a "World-Class Documentation Page".
+          Rules: Use <h1> <h2>, <strong>, <ul>/<li>. Improve clarity. Return HTML.
         `;
         break;
 
-      // --- MODE 4: ORGANIZE (FOR BUBBLE MENU CLUSTERS) ---
+      case 'grammar':
+        systemPrompt = "You are an expert Copy Editor. Correct grammar, spelling, and punctuation. Return ONLY the corrected text.";
+        break;
+
       case 'organize':
+        systemPrompt = "You are an expert Note Organizer. Structure this text into beautiful HTML with <h3> headers and lists.";
+        break;
+
+      case 'continue':
+        systemPrompt = "You are a helpful co-writer. Write the NEXT 2-3 logical sentences to continue the user's thought.";
+        break;
+
+      case 'generate':
+        systemPrompt = "You are MindScribe AI. Write a FULL, COMPREHENSIVE NOTE about the provided topic. Return HTML.";
+        break;
+
+      case 'chat-with-note':
+        systemPrompt = "You are a helpful study tutor. Answer the user's question ONLY based on the provided notes context.";
+        break;
+
+      case 'interview-assist':
         systemPrompt = `
-          You are an expert Note Organizer. 
-          The user has selected a specific cluster of text. 
-          Your job is to REWRITE and STRUCTURE this specific text into beautiful Markdown HTML.
-          
-          Rules:
-          1. Do NOT delete information, just structure it.
-          2. Use <h3> for the main topic header.
-          3. Use <ul> and <li> for lists.
-          4. Use <strong> for keywords.
-          5. Make it readable and visually attractive.
-          6. Return ONLY the HTML string (e.g. <h3>Title</h3><p>...</p>). Do not wrap in markdown code blocks.
+          You are a hidden Interview Assistant.
+          INPUT: Knowledge Base (Notes) + Transcript.
+          PROTOCOL:
+          1. Is the transcript a question directed at the candidate?
+          2. IF NO: Return "SILENCE".
+          3. IF YES: Generate a concise (2-3 sentences) answer based strictly on the notes.
         `;
         break;
 
-      // --- MODE 5: DIAGRAMS ---
-      case 'canvas':
-        systemPrompt = "Convert the provided text into a text-based structural diagram (ASCII art) using arrows (->) and brackets [].";
+      case 'flashcards':
+        systemPrompt = `
+          You are a Teacher. Convert the notes into 5-7 Flashcards.
+          OUTPUT: JSON Array only. Example: [{"front": "Q", "back": "A"}]
+        `;
         break;
 
+      // --- 👇 NEW STUDY LAB MODES ---
+      
+      case 'quiz-generate':
+        systemPrompt = "You are a strict Professor. Generate ONE challenging open-ended question based on the user's notes. Return ONLY the question text.";
+        break;
+
+      case 'quiz-grade':
+        systemPrompt = `
+          You are a Grader. 
+          CONTEXT: Question: "${question}", User Answer: "${userAnswer}", Notes: (Provided).
+          TASK: Grade 0-100.
+          OUTPUT JSON: { "score": 85, "feedback": "...", "correct_answer": "..." }
+        `;
+        break;
+
+      case 'eli5':
+        systemPrompt = "Explain this concept like the user is 5 years old. Use fun analogies (LEGOs, Pizza, Games). Keep it short.";
+        break;
+
+      // 👇 FIXED INTERVIEW PREP MODES
+      case 'interview-q':
+        systemPrompt = `
+          You are a FAANG Hiring Manager. 
+          Based on the user's notes, ask ONE tough technical or behavioral interview question.
+          Return ONLY the question.
+        `;
+        break;
+
+      case 'interview-feedback':
+        systemPrompt = `
+          You are a Hiring Manager.
+          CONTEXT: 
+          - Question: "${question}"
+          - Candidate Answer: "${userAnswer}"
+          - Knowledge Base: (User's notes)
+          
+          TASK: Provide feedback.
+          OUTPUT JSON: {
+            "rating": "Strong Hire" | "Hire" | "Weak Hire" | "No Hire",
+            "feedback": "Critique of the answer...",
+            "better_answer": "A perfect model answer would be..."
+          }
+        `;
+        break;
+        
       default:
-        systemPrompt = "You are a helpful AI study assistant. Improve the following notes.";
+        systemPrompt = "You are a helpful AI study assistant.";
     }
 
     const chatCompletion = await groq.chat.completions.create({
@@ -98,7 +135,7 @@ export async function POST(req: Request) {
       ],
       model: "llama-3.3-70b-versatile",
       temperature: 0.5,
-      max_completion_tokens: 2048,
+      max_completion_tokens: 4096,
     });
 
     return NextResponse.json({ result: chatCompletion.choices[0]?.message?.content });

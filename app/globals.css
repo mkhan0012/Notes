@@ -4,7 +4,9 @@
   /* 1. Link React Font Variables to Tailwind Utilities */
   --font-sans: var(--font-sans); 
   --font-serif: var(--font-serif);
-  --font-handwriting: var(--font-handwriting);
+  
+  /* 👇 This creates the 'font-hand' class for your Architects Daughter font */
+  --font-hand: var(--font-hand), cursive; 
 
   /* 2. Define Theme Colors */
   --color-background: var(--background);
@@ -20,7 +22,8 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #000000;
-    --foreground: #ededed;
+    /* Slightly softened white for dark mode to reduce eye strain */
+    --foreground: #ececec; 
   }
 }
 
@@ -29,7 +32,45 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
   
-  /* FIX: Use standard CSS for antialiasing instead of the Tailwind class name */
+  /* Standard antialiasing */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 👇 SPECIAL TWEAK: Handwriting fonts look better slightly larger */
+.font-hand {
+  font-size: 1.15em; 
+}
+
+.texture-grid {
+  background-image: radial-gradient(#3f3f46 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.texture-dots {
+  background-image: radial-gradient(#3f3f46 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+
+.texture-lined {
+  background-image: linear-gradient(#27272a 1px, transparent 1px);
+  background-size: 100% 32px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a; /* Zinc-800 */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46; /* Zinc-700 */
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.3); /* Purple-500 with opacity */
+  color: white;
 }
