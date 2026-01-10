@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { Brain } from "lucide-react";
-import { motion, useScroll } from "framer-motion";
-import { useState, useEffect } from "react";
+import { motion, useScroll, useMotionValueEvent } from "framer-motion"; // <--- 1. Add useMotionValueEvent
+import { useState } from "react";
 
 export default function Navbar() {
   const { scrollY } = useScroll();
   const [isScrolled, setIsScrolled] = useState(false);
 
-  useEffect(() => {
-    return scrollY.onChange((latest) => {
-      setIsScrolled(latest > 50);
-    });
-  }, [scrollY]);
+  // <--- 2. REPLACE THE OLD useEffect WITH THIS --->
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    setIsScrolled(latest > 50);
+  });
 
   return (
     <motion.nav 
@@ -30,16 +29,16 @@ export default function Navbar() {
           <span className="text-white">MindScribe<span className="text-zinc-500">.ai</span></span>
         </Link>
         
+        {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-8">
             <NavLink href="/features">Features</NavLink>
             <NavLink href="/manifesto">Manifesto</NavLink>
             <NavLink href="/pricing">Pricing</NavLink>
         </div>
 
+        {/* Buttons */}
         <div className="flex items-center gap-4">
-          <Link href="/notes" className="text-sm font-medium text-white hover:opacity-80 transition-opacity">
-            Login
-          </Link>
+         
           <Link 
             href="/notes" 
             className="group flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-sm font-bold hover:scale-105 transition-transform"

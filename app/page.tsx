@@ -3,14 +3,13 @@
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { ArrowRight, Sparkles, LayoutTemplate, Zap, CheckCircle2, MousePointer2, ChevronRight } from "lucide-react";
-import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform, useScroll } from "framer-motion";
+import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { MouseEvent, useRef } from "react";
 
 export default function Home() {
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  // Global mouse tracker for the background glow
   function handleMouseMove({ clientX, clientY }: MouseEvent) {
     mouseX.set(clientX);
     mouseY.set(clientY);
@@ -48,6 +47,7 @@ export default function Home() {
         {/* Hero Section */}
         <div className="flex flex-col items-center text-center space-y-8 mb-32 perspective-1000">
           
+          {/* LINK 1: TOP BADGE */}
           <AnimatedBadge />
           
           <div className="max-w-5xl">
@@ -73,9 +73,11 @@ export default function Home() {
           </motion.p>
 
           <div className="flex flex-col sm:flex-row gap-6 pt-8">
+            
+            {/* LINK 2: START BUTTON */}
             <MagneticButton>
               <Link 
-                href="/notes"
+                href="/notes" // <--- CONNECTED TO NOTES PAGE
                 className="h-14 px-8 rounded-full bg-white text-black font-semibold text-lg flex items-center justify-center gap-2 hover:bg-zinc-200 transition-colors"
               >
                 Start Writing <ArrowRight className="w-5 h-5" />
@@ -113,7 +115,7 @@ export default function Home() {
           </TiltCard>
 
           <TiltCard className="md:row-span-2 flex flex-col">
-             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-600/5 border border-blue-500/20 flex items-center justify-center mb-6 shadow-[0_0_30px_-5px_rgba(59,130,246,0.3)]">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-600/5 border border-blue-500/20 flex items-center justify-center mb-6 shadow-[0_0_30px_-5px_rgba(59,130,246,0.3)]">
                 <LayoutTemplate className="w-7 h-7 text-blue-500" />
               </div>
               <h3 className="text-2xl font-bold mb-4 text-white">Textbook Mode</h3>
@@ -184,19 +186,23 @@ export default function Home() {
 
 function AnimatedBadge() {
   return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.5 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-md mb-8 group cursor-default hover:border-zinc-700 transition-colors"
-    >
-      <Sparkles className="w-4 h-4 text-yellow-400 animate-pulse" />
-      <span className="text-sm font-medium text-zinc-300">
-        v1.0 Public Beta 
-        <span className="mx-2 text-zinc-700">|</span> 
-        <span className="text-zinc-500 group-hover:text-white transition-colors">Join 2,000+ students</span>
-      </span>
-      <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:translate-x-1 transition-transform" />
-    </motion.div>
+    <Link href="/notes"> {/* <--- NOW CLICKABLE: CONNECTED TO NOTES PAGE */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-md mb-8 group cursor-pointer hover:border-zinc-700 hover:bg-zinc-800 transition-all"
+      >
+        <Sparkles className="w-4 h-4 text-yellow-400 animate-pulse" />
+        <span className="text-sm font-medium text-zinc-300">
+          v1.0 Public Beta 
+          <span className="mx-2 text-zinc-700">|</span> 
+          <span className="text-zinc-500 group-hover:text-white transition-colors">Join 2,000+ students</span>
+        </span>
+        <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:translate-x-1 transition-transform" />
+      </motion.div>
+    </Link>
   )
 }
 
