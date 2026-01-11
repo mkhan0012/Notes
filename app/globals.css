@@ -1,23 +1,39 @@
 @import "tailwindcss";
 
+/* 1. Define the Font Face (Point to your public folder) */
+@font-face {
+  font-family: 'Geist';
+  /* Note: In Next.js/Vercel, '/fonts/...' points to 'public/fonts/...' */
+  src: url('/fonts/Geist-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  /* 1. Link React Font Variables to Tailwind Utilities */
+  /* 2. Link React Font Variables to Tailwind Utilities */
   --font-sans: var(--font-sans); 
   --font-serif: var(--font-serif);
   
   /* Custom Fonts */
   --font-hand: var(--font-hand), cursive; 
   --font-signature: var(--font-signature), cursive;
+  
+  /* NEW: Add Geist to Tailwind Theme */
+  --font-geist: var(--font-geist);
 
-  /* 2. Define Theme Colors */
+  /* 3. Define Theme Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 }
 
-/* 3. Global Base Styles */
+/* 4. Global Base Styles */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* NEW: Define the Geist variable */
+  --font-geist: 'Geist', sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,16 +56,22 @@ body {
 
 /* --- CUSTOM UTILITIES --- */
 
-/* 4. Handwritten Font Class */
+/* NEW: Geist Utility Class */
+.font-geist {
+  font-family: var(--font-geist);
+  font-weight: bold;
+}
+
+/* Handwritten Font Class */
 .font-hand {
   font-family: var(--font-hand), cursive;
   font-size: 1.15em; 
 }
 
-/* 5. Signature Font Class */
+/* Signature Font Class */
 .font-signature {
   font-family: var(--font-signature), cursive;
-  font-size: 1.5em; /* Larger size for readability */
+  font-size: 1.5em; 
 }
 
 /* --- TEXTURES --- */
