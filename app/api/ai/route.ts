@@ -5,63 +5,72 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
+// Helper to prevent token overflow
+function truncateText(text: string, maxLength: number = 15000) {
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + "... [TRUNCATED FOR SPEED]";
+}
+
 export async function POST(req: Request) {
   try {
-    // 👇 FIX: Extract all needed variables from the JSON body here
     const { text, mode, subMode, question, userAnswer } = await req.json();
 
     if (!text && mode !== 'quiz-grade') return NextResponse.json({ result: "No text provided." });
 
+    // 1. OPTIMIZE INPUT: Truncate very long text to save input tokens
+    const processedText = truncateText(text);
+
     let systemPrompt = "You are an expert study assistant.";
+    
+    // Default to the lighter model to save tokens unless logic requires the big one
+    let model = "llama-3.1-8b-instant"; 
+    let maxTokens = 1024; // Default lower token limit for speed
 
     switch (mode) {
-      // --- EXISTING MODES ---
+      // --- LIGHTWEIGHT MODES (Llama-3.1-8b) ---
       case 'summary':
+        // User requested: Revision, Exam, Interview Prep, ELI5 -> 8b-instant
+        model = "llama-3.1-8b-instant";
         if (subMode === '1-Min Revision') {
-          systemPrompt = "You are a revision expert. Summarize this into 3-5 high-impact bullet points. Focus ONLY on the critical facts. Use bold text for keywords.";
+          systemPrompt = "Summarize this into 3-5 high-impact bullet points. Focus ONLY on the critical facts. Use bold text for keywords. Be extremely concise.";
         } else if (subMode === 'ELI5 Mode') {
           systemPrompt = "Explain this topic as if the user is 5 years old. Use simple analogies like LEGOs, pizza, or traffic to explain complex concepts.";
         } else if (subMode === 'Exam Focused') {
           systemPrompt = "You are an exam setter. Identify 'High Yield' topics likely to appear on a test. List them as '🔥 Likely Exam Topics'. Highlight definitions and formulas.";
         } else if (subMode === 'Interview Prep') {
-          systemPrompt = "You are a technical interviewer. Generate 3 potential interview questions based on this text. Provide a 'Model Answer' for each.";
+          systemPrompt = "You are a technical interviewer. Generate 3 potential interview questions based on this text. Provide a short 'Model Answer' for each.";
         } else {
           systemPrompt = "Summarize the following text efficiently.";
         }
         break;
 
-      case 'quiz':
-        systemPrompt = "Generate 3 Multiple Choice Questions (MCQs) based on the text. Format clearly with options A) B) C) D). Place the **Correct Answers** hidden at the very bottom.";
-        break;
-
-      case 'auto-format':
-        systemPrompt = `
-          You are MindScribe AI. Transform messy notes into a "World-Class Documentation Page".
-          Rules: Use <h1> <h2>, <strong>, <ul>/<li>. Improve clarity. Return HTML.
-        `;
+      case 'eli5':
+        model = "llama-3.1-8b-instant";
+        systemPrompt = "Explain this concept like the user is 5 years old. Keep it short and fun.";
         break;
 
       case 'grammar':
-        systemPrompt = "You are an expert Copy Editor. Correct grammar, spelling, and punctuation. Return ONLY the corrected text.";
+        model = "llama-3.1-8b-instant";
+        systemPrompt = "Correct grammar, spelling, and punctuation. Return ONLY the corrected text. Do not add conversational filler.";
         break;
 
-      case 'organize':
-        systemPrompt = "You are an expert Note Organizer. Structure this text into beautiful HTML with <h3> headers and lists.";
+      case 'flashcards':
+        model = "llama-3.1-8b-instant";
+        systemPrompt = `Convert the notes into 5-7 Flashcards. OUTPUT JSON Array only: [{"front": "Q", "back": "A"}]`;
         break;
 
-      case 'continue':
-        systemPrompt = "You are a helpful co-writer. Write the NEXT 2-3 logical sentences to continue the user's thought.";
-        break;
-
-      case 'generate':
-        systemPrompt = "You are MindScribe AI. Write a FULL, COMPREHENSIVE NOTE about the provided topic. Return HTML.";
-        break;
-
-      case 'chat-with-note':
-        systemPrompt = "You are a helpful study tutor. Answer the user's question ONLY based on the provided notes context.";
+      // --- HEAVYWEIGHT MODES (Llama-3.3-70b) ---
+      
+      case 'quiz':
+        model = "llama-3.3-70b-versatile"; // Needs logic to ensure correct answers
+        maxTokens = 2048;
+        systemPrompt = "Generate 3 Multiple Choice Questions (MCQs) based on the text. Format clearly with options A) B) C) D). Place the **Correct Answers** hidden at the very bottom.";
         break;
 
       case 'interview-assist':
+        model = "llama-3.3-70b-versatile"; // Needs high reasoning to connect question to notes
+        maxTokens = 1024; // Answers should be concise
         systemPrompt = `
           You are a hidden Interview Assistant.
           INPUT: Knowledge Base (Notes) + Transcript.
@@ -72,20 +81,33 @@ export async function POST(req: Request) {
         `;
         break;
 
-      case 'flashcards':
-        systemPrompt = `
-          You are a Teacher. Convert the notes into 5-7 Flashcards.
-          OUTPUT: JSON Array only. Example: [{"front": "Q", "back": "A"}]
-        `;
+      case 'chat-with-note':
+        model = "llama-3.3-70b-versatile"; // RAG needs better context understanding
+        maxTokens = 2048;
+        systemPrompt = "You are a helpful study tutor. Answer the user's question ONLY based on the provided notes context. Be concise.";
         break;
 
-      // --- 👇 NEW STUDY LAB MODES ---
+      case 'generate':
+        model = "llama-3.3-70b-versatile"; // Creative writing needs the big model
+        maxTokens = 4096;
+        systemPrompt = "You are MindScribe AI. Write a FULL, COMPREHENSIVE NOTE about the provided topic. Return HTML.";
+        break;
       
+      case 'auto-format':
+        model = "llama-3.1-8b-instant"; // formatting is easy for 8b
+        maxTokens = 4096; // Needs space to return full text
+        systemPrompt = `Transform messy notes into clean HTML. Use <h1> <h2>, <strong>, <ul>/<li>.`;
+        break;
+
+      // --- STUDY LAB ---
+
       case 'quiz-generate':
-        systemPrompt = "You are a strict Professor. Generate ONE challenging open-ended question based on the user's notes. Return ONLY the question text.";
+        model = "llama-3.1-8b-instant"; // Simple generation
+        systemPrompt = "Generate ONE challenging open-ended question based on the user's notes. Return ONLY the question text.";
         break;
 
       case 'quiz-grade':
+        model = "llama-3.3-70b-versatile"; // Grading requires reasoning
         systemPrompt = `
           You are a Grader. 
           CONTEXT: Question: "${question}", User Answer: "${userAnswer}", Notes: (Provided).
@@ -94,36 +116,31 @@ export async function POST(req: Request) {
         `;
         break;
 
-      case 'eli5':
-        systemPrompt = "Explain this concept like the user is 5 years old. Use fun analogies (LEGOs, Pizza, Games). Keep it short.";
-        break;
-
-      // 👇 FIXED INTERVIEW PREP MODES
       case 'interview-q':
-        systemPrompt = `
-          You are a FAANG Hiring Manager. 
-          Based on the user's notes, ask ONE tough technical or behavioral interview question.
-          Return ONLY the question.
-        `;
+        model = "llama-3.1-8b-instant"; // Simple generation
+        systemPrompt = "Ask ONE tough technical or behavioral interview question based on the notes. Return ONLY the question.";
         break;
 
       case 'interview-feedback':
+        model = "llama-3.3-70b-versatile"; // Feedback needs depth
+        maxTokens = 2048;
         systemPrompt = `
           You are a Hiring Manager.
-          CONTEXT: 
-          - Question: "${question}"
-          - Candidate Answer: "${userAnswer}"
-          - Knowledge Base: (User's notes)
-          
+          CONTEXT: Question: "${question}", Answer: "${userAnswer}".
           TASK: Provide feedback.
           OUTPUT JSON: {
             "rating": "Strong Hire" | "Hire" | "Weak Hire" | "No Hire",
-            "feedback": "Critique of the answer...",
-            "better_answer": "A perfect model answer would be..."
+            "feedback": "Critique...",
+            "better_answer": "Model answer..."
           }
         `;
         break;
-        
+
+      case 'continue':
+        model = "llama-3.3-70b-versatile"; // Creative continuation
+        systemPrompt = "Write the NEXT 2-3 logical sentences to continue the user's thought.";
+        break;
+
       default:
         systemPrompt = "You are a helpful AI study assistant.";
     }
@@ -131,11 +148,11 @@ export async function POST(req: Request) {
     const chatCompletion = await groq.chat.completions.create({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: text }
+        { role: "user", content: processedText }
       ],
-      model: "llama-3.3-70b-versatile",
+      model: model,
       temperature: 0.5,
-      max_completion_tokens: 4096,
+      max_completion_tokens: maxTokens, // 2. OPTIMIZE OUTPUT: Dynamic token limits
     });
 
     return NextResponse.json({ result: chatCompletion.choices[0]?.message?.content });

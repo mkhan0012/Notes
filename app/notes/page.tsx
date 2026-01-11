@@ -6,7 +6,8 @@ import {
   ChevronLeft, X, BookOpen, GraduationCap, 
   Brain, Zap, Smile, Loader2, Sparkles, 
   MessageSquare, Plus, Menu, Wand2,
-  Mic, MicOff, Grid3X3, Send, Printer, Headphones, Layers 
+  Mic, MicOff, Grid3X3, Send, Printer, Headphones, Layers,
+  Trash2, Search
 } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from 'react-markdown';
@@ -24,7 +25,8 @@ export default function NotesPage() {
   const [content, setContent] = useState(""); 
   
   const [activePanel, setActivePanel] = useState<'none' | 'list' | 'ai-tools' | 'chat'>('none'); 
-  
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiOutput, setAiOutput] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
@@ -46,18 +48,18 @@ export default function NotesPage() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null); 
 
-  // --- ANIMATION VARIANTS (FIXED) ---
+  // --- ANIMATION VARIANTS ---
   const sidebarVariants = {
     hidden: { x: -300, opacity: 0 },
     visible: { 
       x: 0, 
       opacity: 1,
       transition: { 
-        type: "spring" as const, // 👈 FIX: Added 'as const'
+        type: "spring" as const,
         stiffness: 300, 
         damping: 30,
         staggerChildren: 0.05,
-        when: "beforeChildren" as const // 👈 FIX: Added 'as const'
+        when: "beforeChildren" as const
       }
     },
     exit: { x: -300, opacity: 0 }
@@ -68,7 +70,19 @@ export default function NotesPage() {
     visible: { x: 0, opacity: 1 }
   };
 
+  // 🛠️ 1. NEW: Save the active note ID whenever it changes
+  useEffect(() => {
+    if (currentNoteId) {
+        localStorage.setItem('mindscribe_last_note', currentNoteId);
+    }
+  }, [currentNoteId]);
+
   useEffect(() => { fetchNotesList(); }, []);
+
+  const filteredNotes = notesList.filter(note => 
+    note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (note.content && note.content.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   // --- 1. LECTURE MODE ---
   const toggleListening = () => {
@@ -123,6 +137,25 @@ export default function NotesPage() {
       }
   };
 
+  // --- 3. DELETE FUNCTION ---
+  const deleteNote = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this note?")) return;
+
+    try {
+        await fetch(`/api/notes?id=${id}`, { method: 'DELETE' });
+        setNotesList(prev => prev.filter(n => n._id !== id));
+        if (currentNoteId === id) {
+            setCurrentNoteId(null);
+            setTitle("Untitled Note");
+            setContent("");
+            localStorage.removeItem('mindscribe_last_note'); // Clear storage if deleted
+        }
+    } catch (error) {
+        alert("Failed to delete note.");
+    }
+  };
+
   // --- UTILS ---
   const cycleTexture = () => {
       const textures: any[] = ['none', 'grid', 'dots', 'lined'];
@@ -153,12 +186,24 @@ export default function NotesPage() {
     } finally { setIsAiLoading(false); }
   };
 
+  // 🛠️ 2. UPDATED: Fetch logic to restore session
   const fetchNotesList = async () => { 
       try {
         const res = await fetch('/api/notes');
         const data = await res.json();
         setNotesList(data);
-        if (data.length > 0 && !currentNoteId) loadNote(data[0]._id);
+        
+        // Try to retrieve the last saved ID
+        const savedId = localStorage.getItem('mindscribe_last_note');
+        
+        // Find that note in the fresh list (in case it was deleted on another device)
+        const targetNote = data.find((n: any) => n._id === savedId);
+
+        if (targetNote && !currentNoteId) {
+            loadNote(targetNote._id); // Restore last session
+        } else if (data.length > 0 && !currentNoteId) {
+            loadNote(data[0]._id); // Fallback to first note
+        }
       } catch (e) { console.error(e); }
   };
 
@@ -257,11 +302,14 @@ export default function NotesPage() {
                 {isListening ? <MicOff size={16} /> : <Mic size={16} />}
              </button>
              <div className="w-[1px] h-4 bg-white/10" />
-             <Link href="/interview">
+             
+             {/* 🛠️ PASS ID TO INTERVIEW PAGE */}
+             <Link href={currentNoteId ? `/interview?id=${currentNoteId}` : "/interview"}>
                  <button className="p-2 text-zinc-400 hover:text-white rounded-full hover:bg-white/10 transition-colors" title="Interview Mode">
                     <Headphones size={16} />
                  </button>
              </Link>
+
              <div className="w-[1px] h-4 bg-white/10" />
              <button onClick={handlePrint} className="p-2 text-zinc-400 hover:text-white rounded-full hover:bg-white/10 transition-colors" title="Print"><Printer size={16} /></button>
         </div>
@@ -304,22 +352,50 @@ export default function NotesPage() {
             exit="exit" 
             className="fixed top-0 left-0 h-screen w-80 bg-zinc-950/80 backdrop-blur-xl border-r border-white/5 z-30 pt-20 px-4 flex flex-col print:hidden"
           >
-             <div className="flex justify-between items-center mb-6 px-2">
-                 <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-500 font-mono">My Notes</h2>
-                 <button onClick={createNewNote} className="p-2 bg-white text-black rounded-lg"><Plus size={16}/></button>
+             {/* SIDEBAR HEADER + SEARCH */}
+             <div className="flex flex-col gap-4 mb-4 px-2">
+                 <div className="flex justify-between items-center">
+                     <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-500 font-mono">My Notes</h2>
+                     <button onClick={createNewNote} className="p-2 bg-white text-black rounded-lg hover:scale-105 transition-transform"><Plus size={16}/></button>
+                 </div>
+                 
+                 {/* SEARCH BAR */}
+                 <div className="relative">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
+                     <input 
+                        type="text" 
+                        placeholder="Search notes..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-purple-500/50 outline-none placeholder:text-zinc-600 font-sans"
+                     />
+                 </div>
              </div>
              
+             {/* FILTERED LIST */}
              <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
-                 {notesList.map(note => (
+                 {filteredNotes.map(note => (
                      <motion.div 
                         key={note._id} 
                         variants={itemVariants}
                         onClick={() => loadNote(note._id)} 
-                        className={`p-3 rounded-lg cursor-pointer font-hand truncate transition-colors ${currentNoteId === note._id ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-white hover:bg-white/5'}`}
+                        className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer font-hand transition-colors ${currentNoteId === note._id ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-white hover:bg-white/5'}`}
                      >
-                        {note.title}
+                        <span className="truncate flex-1">{note.title || "Untitled Note"}</span>
+                        
+                        {/* DELETE BUTTON */}
+                        <button 
+                            onClick={(e) => deleteNote(e, note._id)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all"
+                            title="Delete Note"
+                        >
+                            <Trash2 size={14} />
+                        </button>
                      </motion.div>
                  ))}
+                 {filteredNotes.length === 0 && (
+                     <p className="text-zinc-600 text-center text-xs mt-4">No notes found.</p>
+                 )}
              </div>
           </motion.aside>
         )}
@@ -378,8 +454,8 @@ export default function NotesPage() {
       {/* LIQUID DOCK (BOTTOM MENU) */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 p-1.5 rounded-2xl bg-zinc-950/80 backdrop-blur-2xl border border-white/10 shadow-2xl print:hidden flex items-center gap-1">
          
-         {/* STUDY LINK BUTTON */}
-         <Link href="/study">
+         {/* 🛠️ PASS ID TO STUDY PAGE */}
+         <Link href={currentNoteId ? `/study?id=${currentNoteId}` : "/study"}>
              <button className="relative w-12 h-12 flex items-center justify-center rounded-xl transition-colors hover:bg-white/10">
                  <BookOpen size={20} className="text-zinc-400 hover:text-white transition-colors" />
              </button>

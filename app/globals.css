@@ -5,8 +5,9 @@
   --font-sans: var(--font-sans); 
   --font-serif: var(--font-serif);
   
-  /* 👇 This creates the 'font-hand' class for your Architects Daughter font */
+  /* Custom Fonts */
   --font-hand: var(--font-hand), cursive; 
+  --font-signature: var(--font-signature), cursive;
 
   /* 2. Define Theme Colors */
   --color-background: var(--background);
@@ -22,7 +23,6 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #000000;
-    /* Slightly softened white for dark mode to reduce eye strain */
     --foreground: #ececec; 
   }
 }
@@ -32,16 +32,27 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), sans-serif;
   
-  /* Standard antialiasing */
+  /* Smooth Typography */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
-/* 👇 SPECIAL TWEAK: Handwriting fonts look better slightly larger */
+/* --- CUSTOM UTILITIES --- */
+
+/* 4. Handwritten Font Class */
 .font-hand {
+  font-family: var(--font-hand), cursive;
   font-size: 1.15em; 
 }
+
+/* 5. Signature Font Class */
+.font-signature {
+  font-family: var(--font-signature), cursive;
+  font-size: 1.5em; /* Larger size for readability */
+}
+
+/* --- TEXTURES --- */
 
 .texture-grid {
   background-image: radial-gradient(#3f3f46 1px, transparent 1px);
@@ -57,20 +68,27 @@ body {
   background-image: linear-gradient(#27272a 1px, transparent 1px);
   background-size: 100% 32px;
 }
+
+/* --- SCROLLBARS --- */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a; /* Zinc-800 */
+  background: #27272a; 
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46; /* Zinc-700 */
+  background: #3f3f46; 
 }
 
 ::selection {
-  background: rgba(168, 85, 247, 0.3); /* Purple-500 with opacity */
+  background: rgba(168, 85, 247, 0.3); 
   color: white;
 }

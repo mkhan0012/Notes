@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Mic, ChevronLeft, Brain, Sparkles, Loader2, StopCircle, EyeOff, Copy, Check } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation"; // Import this
 
 export default function InterviewPage() {
   const [notesContext, setNotesContext] = useState("");
@@ -20,20 +21,45 @@ export default function InterviewPage() {
   const recognitionRef = useRef<any>(null);
   const silenceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. LOAD NOTES
+  const searchParams = useSearchParams();
+  const noteId = searchParams.get('id'); // Get ID from URL
+
+  // 1. LOAD SPECIFIC NOTE OR FALLBACK
   useEffect(() => {
     async function loadKnowledgeBase() {
       try {
-        const res = await fetch('/api/notes');
-        const notes = await res.json();
-        const context = notes.map((n: any) => `TITLE: ${n.title}\n${n.content}`).join('\n---\n');
+        let context = "";
+        
+        if (noteId) {
+             // 燥 CASE 1: Load SPECIFIC Note (User came from a specific note)
+             const res = await fetch(`/api/notes?id=${noteId}`);
+             const note = await res.json();
+             context = `TITLE: ${note.title}\n${note.content}`;
+        } else {
+             // 燥 CASE 2: No ID provided -> Load LATEST note by default
+             const resList = await fetch('/api/notes');
+             const notesList = await resList.json();
+             
+             if (notesList.length > 0) {
+                 // Fetch full content of the first note in the list (latest)
+                 const resNote = await fetch(`/api/notes?id=${notesList[0]._id}`);
+                 const note = await resNote.json();
+                 context = `TITLE: ${note.title}\n${note.content}`;
+             } else {
+                 context = "No notes found.";
+             }
+        }
+
         setNotesContext(context);
         setLoadingNotes(false);
-      } catch (e) { console.error("Failed to load notes"); }
+      } catch (e) { 
+          console.error("Failed to load notes"); 
+          setLoadingNotes(false);
+      }
     }
     loadKnowledgeBase();
     return () => stopSession();
-  }, []);
+  }, [noteId]);
 
   // 2. ⌨️ KEYBOARD SHORTCUTS
   useEffect(() => {
@@ -155,7 +181,9 @@ export default function InterviewPage() {
                             <Brain size={64} className="text-zinc-200 relative z-10" />
                         </div>
                         <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-4">Interview Assistant</h1>
-                        <p className="text-zinc-500 text-lg mb-10 max-w-md">Memorized. Listening. Ready.</p>
+                        <p className="text-zinc-500 text-lg mb-10 max-w-md">
+                            {loadingNotes ? "Loading Context..." : "Memorized. Listening. Ready."}
+                        </p>
                         <button onClick={startSession} disabled={loadingNotes} className="group relative px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:scale-105 transition-transform flex items-center gap-3">
                             {loadingNotes ? <Loader2 className="animate-spin" /> : <Mic />}
                             {loadingNotes ? "Loading Notes..." : "Start Session (Space)"}

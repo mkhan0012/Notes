@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import NeuralBackground from "@/components/NeuralBackground";
+import { useSearchParams } from "next/navigation"; // 燥 IMPORT
 
 export default function StudyPage() {
   const [activeTab, setActiveTab] = useState<'hub' | 'quiz' | 'eli5' | 'interview'>('hub');
@@ -29,6 +30,9 @@ export default function StudyPage() {
   const [intAns, setIntAns] = useState("");
   const [intRes, setIntRes] = useState<any>(null);
   const [intLoading, setIntLoading] = useState(false);
+
+  const searchParams = useSearchParams();
+  const noteId = searchParams.get('id'); // 燥 GET ID
 
   // 🛠️ HELPER: Safe JSON Parser (Fixes the crash)
   const safeJSONParse = (input: string) => {
@@ -54,15 +58,35 @@ export default function StudyPage() {
   useEffect(() => {
     async function loadNotes() {
       try {
-        const res = await fetch('/api/notes');
-        const data = await res.json();
-        const context = data.map((n: any) => `TITLE: ${n.title}\n${n.content}`).join('\n---\n');
+        let context = "";
+
+        if (noteId) {
+             // 燥 CASE 1: Fetch SPECIFIC Note (with content)
+             const res = await fetch(`/api/notes?id=${noteId}`);
+             const note = await res.json();
+             context = `TITLE: ${note.title}\n${note.content}`;
+        } else {
+             // 燥 CASE 2: No ID? Fetch Latest Note (with content)
+             // Step A: Get list
+             const resList = await fetch('/api/notes');
+             const data = await resList.json();
+             
+             if (data.length > 0) {
+                 // Step B: Get content of the FIRST note in list
+                 const resNote = await fetch(`/api/notes?id=${data[0]._id}`);
+                 const note = await resNote.json();
+                 context = `TITLE: ${note.title}\n${note.content}`;
+             } else {
+                 context = "No notes found.";
+             }
+        }
+        
         setNotesContext(context);
         setLoading(false);
       } catch (e) { console.error(e); }
     }
     loadNotes();
-  }, []);
+  }, [noteId]);
 
   // --- LOGIC ---
 
@@ -85,7 +109,6 @@ export default function StudyPage() {
       });
       const data = await res.json();
       
-      // 👇 FIX APPLIED HERE
       const parsed = safeJSONParse(data.result);
       if (parsed) setQuizRes(parsed);
       else alert("AI format error. Please try again.");
@@ -112,7 +135,6 @@ export default function StudyPage() {
         });
         const data = await res.json();
         
-        // 👇 FIX APPLIED HERE
         const parsed = safeJSONParse(data.result);
         if (parsed) setIntRes(parsed);
         else alert("AI format error. Please try again.");
